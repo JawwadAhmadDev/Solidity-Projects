@@ -607,11 +607,11 @@ contract $ARCHIE is Context, IERC20 {
                 require(amount <= maxTxAmount,"Max Transaction per amount reached");
 
                 uint256 walletcheckamt = amount.sub((calculatebuyliquidityFee(amount).add(calculatebuymarketingFee(amount))));
-                require(_balances[recipient].add(walletcheckamt) <= maxwalletamount,"Max receiving limit reached!");
+                require(_balances[recipient].add(walletcheckamt) <= maxwalletamount,"Max buying limit reached!");
 
                 if(block.timestamp < _firstBuytime[recipient].add(locktime)){			 
 			
-				    require(_totalAmountBuy[recipient]+amount <= maxbuyamount, "You can't sell more than maxbuyamount 1");
+				    require(_totalAmountBuy[recipient]+amount <= maxbuyamount, "You can't buy more than maxbuyamount 1");
 				    _totalAmountBuy[recipient]= _totalAmountBuy[recipient].add(amount);
                     _balances[sender] = _balances[sender].sub(amount, "ERC20: buy amount exceeds balance 1");
 
@@ -624,7 +624,7 @@ contract $ARCHIE is Context, IERC20 {
 
                 else if(block.timestamp>_firstBuytime[recipient].add(locktime)){
                     _totalAmountBuy[recipient] = 0;
-                    require(_totalAmountBuy[recipient].add(amount) <= maxbuyamount, "You can't sell more than maxbuyamount 2");
+                    require(_totalAmountBuy[recipient].add(amount) <= maxbuyamount, "You can't buy more than maxbuyamount 2");
                     _balances[sender] = _balances[sender].sub(amount, "ERC20: buy amount exceeds balance 2");
 
                     _balances[address(this)] = _balances[address(this)].add(calculatebuyliquidityFee(amount));
