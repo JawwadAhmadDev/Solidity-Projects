@@ -984,3 +984,5 @@ contract UMETA_TENCARD is Ownable {
 
 //ArchieMeta NFT: 0x98c4b47dD4987e96256A2616060d212f19246c7A
 //Token Address: 0x208F521710620d417E9f35a37f107e360f4A7c3d
+
+// deployed Address: https://testnet.bscscan.com/address/0xc33293631f4f1fb81df5b4cfd85945c7ee2868fb#writeContract
