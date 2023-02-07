@@ -10,7 +10,7 @@
 // OpenZeppelin Contracts (last updated v4.8.0) (utils/structs/EnumerableSet.sol)
 // This file was procedurally generated from scripts/generate/templates/EnumerableSet.js.
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.7;
 
 /**
  * @dev Library for managing
@@ -869,50 +869,71 @@ contract UMETA_TENCARD is Ownable {
             return cardNo;
         }
         function generateRandomNumber() public view returns (uint) {
-            uint256 card_No = (uint(keccak256(abi.encodePacked(block.difficulty,block.timestamp, total_cards)))) % total_cards;
+            uint256 card_No = (uint(keccak256(abi.encodePacked(block.prevrandao,block.timestamp, total_cards)))) % total_cards;
             
             return card_No;
         }
     
 
     function withdraw(uint256[] memory _indexes) external {
-        require(_indexes.length > 0, "Invalid Indexes length");
+        uint256 _indexesLength = _indexes.length;
+        require(_indexesLength > 0, "Invalid Indexes length");
         User_Info[] storage _userInfo = userInfo[msg.sender];
+        require(_indexesLength <= _userInfo.length, "Length should be less than user's array length");
         uint256 totalAmount;
 
-        for (uint i; i < _indexes.length; i++){
-            totalAmount += _userInfo[i]._rewardAmount;
-            removeByShifting(i);
+        for (uint i; i < _indexesLength; i++){
+                totalAmount += _userInfo[_indexes[i]]._rewardAmount;
+        }
+        
+        if(_indexesLength == _userInfo.length){
+            for(uint i; i < _indexesLength; i++){
+                _userInfo.pop();
+            }
+        }
+        else {
+            uint _count;
+
+            for (uint i; i < _indexesLength; i++){
+                uint _index = _indexes[i];
+
+                for (uint j = _index - _count; j < _userInfo.length - 1; j++){
+                    _userInfo[j] = _userInfo[j + 1];
+                }
+                _userInfo.pop();
+                _count++;
+            }
+
         }
 
         Archie_Token.transfer(msg.sender, totalAmount);
         emit Withdraw(msg.sender, totalAmount, block.timestamp);
     }
-        function removeByShifting(uint _index) internal {
-            User_Info[] storage _userInfo = userInfo[msg.sender];
-            require(_index < _userInfo.length, "index out of bound");
 
-            for (uint i = _index; i < _userInfo.length - 1; i++){
-                _userInfo[i] = _userInfo[i + 1];
-            }
-            _userInfo.pop();
-        }
 
     function UserInfo(address _addr) public view
         returns (
-            string[] memory NFTsURIs,
-            uint256[] memory usersCardNo,
-            uint256[] memory usersRewardAmount
+            string[] memory,
+            // uint256[] memory,
+            uint256[] memory,
+            uint256[] memory
         )
     {
         User_Info[] memory _userInfo = userInfo[_addr];
+        string[] memory NFTsURIs = new string[](_userInfo.length);
+        // uint256[] memory NFTsIDs = new uint256[](_userInfo.length);   
+        uint256[] memory usersCardNo = new uint256[](_userInfo.length);        
+        uint256[] memory usersRewardAmount = new uint256[](_userInfo.length);
 
         for (uint i = 0; i < _userInfo.length; i++) {
             User_Info memory _user_info = _userInfo[i];
             NFTsURIs[i] = Archie_NFT.tokenURI(_user_info._nftID);
+            // NFTsIDs[i] = _user_info._nftID;
             usersCardNo[i] = _user_info._cardNo;
             usersRewardAmount[i] = _user_info._rewardAmount;
         }
+
+        return (NFTsURIs, usersCardNo, usersRewardAmount);
     }
 
 
@@ -960,3 +981,6 @@ contract UMETA_TENCARD is Ownable {
         }
     }
 }
+
+//ArchieMeta NFT: 0x98c4b47dD4987e96256A2616060d212f19246c7A
+//Token Address: 0x208F521710620d417E9f35a37f107e360f4A7c3d
