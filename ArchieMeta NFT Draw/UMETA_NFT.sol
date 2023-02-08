@@ -10,7 +10,7 @@
 // OpenZeppelin Contracts (last updated v4.8.0) (utils/structs/EnumerableSet.sol)
 // This file was procedurally generated from scripts/generate/templates/EnumerableSet.js.
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.7;
 
 /**
  * @dev Library for managing

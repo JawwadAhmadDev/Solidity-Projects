@@ -3,7 +3,7 @@
 // ERC721A Contracts v4.2.0
 // Creator: Chiru Labs
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.17;
 
 import './IERC721A.sol';
 import"./Ownable.sol";
@@ -215,7 +215,9 @@ contract ERC721A is IERC721A {
      * @dev Returns the number of tokens in `owner`'s account.
      */
     function balanceOf(address owner) public view virtual override returns (uint256) {
-        if (owner == address(0)) revert BalanceQueryForZeroAddress();
+        if (owner == address(0)) {
+            revert BalanceQueryForZeroAddress();
+        }
         return _packedAddressData[owner] & _BITMASK_ADDRESS_DATA_ENTRY;
     }
 
