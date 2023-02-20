@@ -317,22 +317,24 @@ contract Referral is Ownable {
     uint256 constant DECIMALS = 10000; // 10000 % to handle decimals. denomenator for calculating percentage
 
     struct Account {
-        uint256 nonWorkingReward;
+        bool isActive;
+        uint256 investedTime;
         uint256 investedAmount;
-        uint256 withdrawlAmount;
-        uint256 lastInvestedTime;
+        uint256 nonWorkingRewardPending;
+        uint256 lastNonWorkingWithdrawTime;
     }
 
     struct MetaInfo {
         address referrer;
         uint256 referredCount;
-        uint256 workingOneTimeReward;
-        uint256 workingDailyReward;
-        uint256 dailyRewardPercent;
-        uint256 totalInvestedAmount;
-        uint256 biggesetInvestment;
         uint256 lastDirectTime;
+        uint256 dailyRewardPercent;
+        uint256 biggesetInvestment;
+        uint256 totalInvestedAmount;
+        uint256 workingDailyRewardWithdrawn;
+        uint256 workingOneTimeRewardWithdrawn;
         uint256 lastWithDrawNonWorkingRewardTime;
+        uint256 totalWorkingRewardWithdrawn;
     }
 
     event RegisteredReferer(address referee, address referrer);
@@ -362,15 +364,15 @@ contract Referral is Ownable {
     address marketing1=0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db;
     address marketing2=0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db;
     address marketing3=0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db;
-    uint256 marketingPercentage= 333;
+    uint256 marketingPercentage= 333; // 3.33%
 
-    constructor(address _token) {
+    constructor(address _token, address _defaultReferrerAddress) {
         require(_token != address(0), "Referral: Invalid Token address");
 
         Token = IERC20(_token);
         levelRate_OneTimeWorkingReward = [500, 300, 200, 100, 50, 50, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25];
         levelRate_DailyReward = [2500, 1000, 500, 300, 100, 100, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50];
-        defaultReferrerAddress = msg.sender;
+        defaultReferrerAddress = _defaultReferrerAddress;
     }
 
     function invest(uint256 _amount) external {
@@ -379,15 +381,15 @@ contract Referral is Ownable {
             "Referral: Not registered yet or not a default referrer."
         );
         require(_amount >= minInvestAmount && _amount <= maxInvestAmount, "Referral: Invalid Amount");
-
         
         Account[] storage userAccounts = accounts[msg.sender];
 
         userAccounts.push(Account({
-            nonWorkingReward: 0,
+            isActive: true,
+            nonWorkingRewardPending: _amount.mul(2),
             investedAmount: _amount,
-            withdrawlAmount: 0,
-            lastInvestedTime: block.timestamp
+            investedTime: block.timestamp,
+            lastNonWorkingWithdrawTime: block.timestamp
         }));
 
         Token.transferFrom(msg.sender, address(this), _amount);
@@ -414,10 +416,11 @@ contract Referral is Ownable {
         Account[] storage userAccounts = accounts[msg.sender];
 
         userAccounts.push(Account({
-            nonWorkingReward: 0,
+            isActive: true,
+            nonWorkingRewardPending: _amount.mul(2),
             investedAmount: _amount,
-            withdrawlAmount: 0,
-            lastInvestedTime: block.timestamp
+            investedTime: block.timestamp,
+            lastNonWorkingWithdrawTime: block.timestamp
         }));
         Token.transfer(marketing1 , _amount.mul(marketingPercentage).div(DECIMALS));
         Token.transfer(marketing2 , _amount.mul(marketingPercentage).div(DECIMALS));
@@ -515,7 +518,7 @@ contract Referral is Ownable {
 
             totalReferal = totalReferal.add(c);
 
-            _parentMetaInfo.workingOneTimeReward = _parentMetaInfo.workingOneTimeReward.add(c);
+            _parentMetaInfo.workingOneTimeRewardWithdrawn = _parentMetaInfo.workingOneTimeRewardWithdrawn.add(c);
             
             Token.transfer(parent, c);
             emit PaidOnetimeReferral(msg.sender, parent, c, i + 1);
@@ -523,6 +526,7 @@ contract Referral is Ownable {
             userMetaInfo = _parentMetaInfo;
         }
 
+        userMetaInfo.totalInvestedAmount = userMetaInfo.totalInvestedAmount.add(value);
         if(value > parentMetaInfo.biggesetInvestment) {
             parentMetaInfo.biggesetInvestment = value;
         }
@@ -531,21 +535,59 @@ contract Referral is Ownable {
         return totalReferal;
     }
     
-    function withDrawNonWorkingReward(uint256 index) external {
+    function withDrawNonWorkingReward() external {
         MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
-        uint256 _nonWorkingReward = calculateNonWorkingRewardOf(msg.sender, index);
-        
+        // Account[] storage userAccounts = accounts[msg.sender];
+        uint256 _nonWorkingReward = calculateNonWorkingRewardOf(msg.sender);
+        // uint256 _workingReward = 
         Token.transfer(msg.sender, _nonWorkingReward);
         uint256 _totalTransferedWorkingRewardToUplines = _payWorkingRewardToUplines(_nonWorkingReward);
         userMetaInfo.lastWithDrawNonWorkingRewardTime = block.timestamp;
+        _updateDataAccordingly(_nonWorkingReward, _totalTransferedWorkingRewardToUplines);
+        // emit TotalPaidToUplinesOnDailyWithDrawl(msg.sender, _totalTransferedWorkingRewardToUplines, index);
+    }
+    function _updateDataAccordingly(uint256 nonWorkingReward, uint256 workingRewardToUplines) public {
+        Account[] storage userAccounts = accounts[msg.sender];
+        uint256 currentTime = block.timestamp;
+        for(uint i; i < userAccounts.length; i++){
+            Account storage userAccount = userAccounts[i];
+            if(nonWorkingReward >= userAccount.investedAmount)
+        }
+        for(uint i; i < userAccounts.length; i++){
+            Account storage userAccount = userAccounts[i];
+            if(userAccount.isActive){
+                userAccount.lastNonWorkingWithdrawTime = currentTime;
+            }
+        }
+    }
+    function calculateNonWorkingRewardOf(address _addr) public view returns (uint) {
+        Account[] memory userAccounts = accounts[_addr];
 
-        emit TotalPaidToUplinesOnDailyWithDrawl(msg.sender, _totalTransferedWorkingRewardToUplines, index);
+        uint totalReward;
+        for (uint i; i < userAccounts.length; i++){
+            if(userAccounts[i].isActive){
+                totalReward += calculateNonWorkingRewardOfAt(_addr, i);
+            }
+        }
+        return totalReward;
     }
 
-    function calculateNonWorkingRewardOf(address _addr, uint _index) public view returns (uint) {
+    // function withDrawNonWorkingReward(uint256 index) external {
+    //     MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
+    //     uint256 _nonWorkingReward = calculateNonWorkingRewardOf(msg.sender, index);
+    //     // uint256 _workingReward = 
+    //     Token.transfer(msg.sender, _nonWorkingReward);
+    //     uint256 _totalTransferedWorkingRewardToUplines = _payWorkingRewardToUplines(_nonWorkingReward);
+    //     userMetaInfo.lastWithDrawNonWorkingRewardTime = block.timestamp;
+
+    //     emit TotalPaidToUplinesOnDailyWithDrawl(msg.sender, _totalTransferedWorkingRewardToUplines, index);
+    // }
+
+    function calculateNonWorkingRewardOfAt(address _addr, uint _index) public view returns (uint) {
         Account memory userAccount = accounts[_addr][_index];
+        require(userAccount.isActive, "Referral: ID is inActive.");
         MetaInfo memory userMetaInfo = metaInfoOf[_addr];
-        uint256 timeDifference = block.timestamp.sub(userAccount.lastInvestedTime);
+        uint256 timeDifference = block.timestamp.sub(userAccount.lastNonWorkingWithdrawTime);
         uint256 rewardableDays = timeDifference.div(10);
         uint256 rewardableAmount = rewardableDays.mul(userAccount.investedAmount.mul(userMetaInfo.dailyRewardPercent).div(DECIMALS));
 
@@ -569,7 +611,7 @@ contract Referral is Ownable {
 
             totalReferal = totalReferal.add(c);
 
-            parentMetaInfo.workingDailyReward = parentMetaInfo.workingDailyReward.add(c);
+            parentMetaInfo.workingDailyRewardWithdrawn = parentMetaInfo.workingDailyRewardWithdrawn.add(c);
             
             Token.transfer(parent, c);
             emit PaidDailyReferral(msg.sender, parent, c, i + 1);
