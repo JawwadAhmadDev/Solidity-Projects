@@ -331,10 +331,10 @@ contract Referral is Ownable {
         uint256 dailyRewardPercent;
         uint256 biggesetInvestment;
         uint256 totalInvestedAmount;
-        uint256 workingDailyRewardWithdrawn;
-        uint256 workingOneTimeRewardWithdrawn;
+        uint256 workingDailyReward_Pending;
+        uint256 workingOneTimeReward_Pending;
         uint256 lastWithDrawNonWorkingRewardTime;
-        // uint256 totalWorkingRewardWithdrawn;
+        uint256 totalWorkingReward_Pending;
     }
 
     event RegisteredReferer(address referee, address referrer);
@@ -518,9 +518,10 @@ contract Referral is Ownable {
 
             totalReferal = totalReferal.add(c);
 
-            _parentMetaInfo.workingOneTimeRewardWithdrawn = _parentMetaInfo.workingOneTimeRewardWithdrawn.add(c);
+            _parentMetaInfo.workingOneTimeReward_Pending = _parentMetaInfo.workingOneTimeReward_Pending.add(c);
+            _parentMetaInfo.totalWorkingReward_Pending = _parentMetaInfo.totalWorkingReward_Pending.add(c);
             
-            Token.transfer(parent, c);
+            // Token.transfer(parent, c);
             emit PaidOnetimeReferral(msg.sender, parent, c, i + 1);
 
             userMetaInfo = _parentMetaInfo;
@@ -535,25 +536,31 @@ contract Referral is Ownable {
         return totalReferal;
     }
     
-    function withDrawNonWorkingReward() external {
+    function withDrawReward() external {
         MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
         uint256 _nonWorkingReward = calculateNonWorkingRewardOf(msg.sender);
+        uint256 _workingReward = calculateWorkingRewardOf(msg.sender);
+        uint256 (_actualWorkingReward, _actualNonWorkingReward) = calculateActualReward(msg.sender, _nonWorkingReward, _workingReward);
         Token.transfer(msg.sender, _nonWorkingReward);
         uint256 _totalTransferedWorkingRewardToUplines = _payWorkingRewardToUplines(_nonWorkingReward);
         userMetaInfo.lastWithDrawNonWorkingRewardTime = block.timestamp;
-        _updateDataAccordingly(_nonWorkingReward, _totalTransferedWorkingRewardToUplines);
+        _updateDataAccordingly(_nonWorkingReward);
     }
-    function _updateDataAccordingly(uint256 nonWorkingReward, uint256 workingRewardToUplines) public {
+    function _updateDataAccordingly(uint256 nonWorkingReward) public {
         Account[] storage userAccounts = accounts[msg.sender];
         MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
-        uint256 totalWorkingRewardWithdrawn = userMetaInfo.workingDailyRewardWithdrawn.add(userMetaInfo.workingOneTimeRewardWithdrawn);
         uint256 currentTime = block.timestamp;
+
         for(uint i; i < userAccounts.length; i++){
+            uint256 totalWorkingReward = userMetaInfo.workingDailyReward_Pending.add(userMetaInfo.workingOneTimeReward_Pending);
             Account storage userAccount = userAccounts[i];
+            
             if(userAccount.isActive){
-                if(nonWorkingReward >= userAccount.investedAmount.mul(2) || totalWorkingRewardWithdrawn >= userAccount.investedAmount.mul(3)){
+                if(nonWorkingReward >= userAccount.investedAmount.mul(2) || totalWorkingReward >= userAccount.investedAmount.mul(3)){
                     userAccount.isActive = false;
                     nonWorkingReward = nonWorkingReward.sub(userAccount.investedAmount);
+                    userMetaInfo.workingDailyReward_Pending = userMetaInfo.workingDailyReward_Pending.sub(userAccount.investedAmount);
+                    userMetaInfo.workingOneTimeReward_Pending = userMetaInfo.workingOneTimeReward_Pending.sub(userAccount.investedAmount);
                 }
                 if(userAccount.isActive){
                     userAccount.lastNonWorkingWithdrawTime = currentTime;
@@ -572,6 +579,77 @@ contract Referral is Ownable {
         }
         return totalReward;
     }
+    
+    function calculateNonWorkingRewardOfAt(address _addr, uint _index) public view returns (uint) {
+        Account memory userAccount = accounts[_addr][_index];
+        require(userAccount.isActive, "Referral: ID is inActive.");
+        MetaInfo memory userMetaInfo = metaInfoOf[_addr];
+        uint256 timeDifference = block.timestamp.sub(userAccount.lastNonWorkingWithdrawTime);
+        uint256 rewardableDays = timeDifference.div(10); // at the time of deployment change 10 to 1 days
+        uint256 rewardableAmount = rewardableDays.mul(userAccount.investedAmount.mul(userMetaInfo.dailyRewardPercent).div(DECIMALS));
+
+        return rewardableAmount;
+    }
+    function calculateWorkingRewardOf(address _addr) public view returns (uint) {
+        MetaInfo memory userMetaInfo = metaInfoOf[_addr];
+        return userMetaInfo.totalWorkingReward_Pending;
+    }
+    function calculateActualReward(address _addr, uint _nonWorkingReward, uint _workingReward) public returns (uint) {
+        MetaInfo storage userMetaInfo = metaInfoOf[_addr];
+        Account[] storage userAccounts = accounts[_addr];
+        uint actualReward;
+
+        if(_workingReward == 0){
+            for(uint i; i < userAccounts.length; i++) {
+                Account storage userAccount = userAccounts[i];
+                if(userAccount.isActive){
+                    uint256 _totalPending = userAccount.nonWorkingRewardPending; // = 2x
+                    if(_nonWorkingReward >= _totalPending){
+                        actualReward += _totalPending;
+                        _nonWorkingReward -= _totalPending;
+                        userAccount.nonWorkingRewardPending = 0;
+                        userAccount.isActive = false;
+                    }
+                    else {
+                        actualReward += _nonWorkingReward;
+                        userAccount.nonWorkingRewardPending -= _nonWorkingReward;
+                        _nonWorkingReward = 0;
+                        break;
+                    }
+                } 
+            }
+        }
+        else {
+            for(uint i; i < userAccounts.length; i++) {
+                Account storage userAccount = userAccounts[i];
+                if(userAccount.isActive){
+                    uint256 _investedAmount = userAccount.investedAmount;
+                    uint256 _totalPending = userAccount.nonWorkingRewardPending + _investedAmount;  // = 3x
+                    uint256 _totalReward = _workingReward + _nonWorkingReward;
+                    if(_workingReward >= _totalPending){
+                        actualReward += _totalPending;
+                        _workingReward -= _totalPending;
+                        userMetaInfo.totalWorkingReward_Pending -= _totalPending;
+                        userAccount.nonWorkingRewardPending = 0;
+                        userAccount.isActive = false;
+                    }
+                    else if (_totalReward >= _totalPending) {
+                        if(_workingReward >= _investedAmount){
+                            
+                        }
+                    }
+                    else {
+                        actualReward += _totalReward;
+                        userAccount.nonWorkingRewardPending -= _totalReward;
+                        userMetaInfo.totalWorkingReward_Pending -= _totalReward;
+                        _workingReward = 0;
+                        _nonWorkingReward = 0;
+                        break;
+                    }
+                }
+            }
+        }
+   }
 
     // function withDrawNonWorkingReward(uint256 index) external {
     //     MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
@@ -584,16 +662,7 @@ contract Referral is Ownable {
     //     emit TotalPaidToUplinesOnDailyWithDrawl(msg.sender, _totalTransferedWorkingRewardToUplines, index);
     // }
 
-    function calculateNonWorkingRewardOfAt(address _addr, uint _index) public view returns (uint) {
-        Account memory userAccount = accounts[_addr][_index];
-        require(userAccount.isActive, "Referral: ID is inActive.");
-        MetaInfo memory userMetaInfo = metaInfoOf[_addr];
-        uint256 timeDifference = block.timestamp.sub(userAccount.lastNonWorkingWithdrawTime);
-        uint256 rewardableDays = timeDifference.div(10);
-        uint256 rewardableAmount = rewardableDays.mul(userAccount.investedAmount.mul(userMetaInfo.dailyRewardPercent).div(DECIMALS));
-
-        return rewardableAmount;
-    }
+    
     function _payWorkingRewardToUplines(uint256 value) public returns (uint256) {
         MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
         uint256 totalReferal;
@@ -612,9 +681,10 @@ contract Referral is Ownable {
 
             totalReferal = totalReferal.add(c);
 
-            parentMetaInfo.workingDailyRewardWithdrawn = parentMetaInfo.workingDailyRewardWithdrawn.add(c);
+            parentMetaInfo.workingDailyReward_Pending = parentMetaInfo.workingDailyReward_Pending.add(c);
+            parentMetaInfo.totalWorkingReward_Pending = parentMetaInfo.totalWorkingReward_Pending.add(c);
             
-            Token.transfer(parent, c);
+            // Token.transfer(parent, c);
             emit PaidDailyReferral(msg.sender, parent, c, i + 1);
 
             userMetaInfo = parentMetaInfo;
