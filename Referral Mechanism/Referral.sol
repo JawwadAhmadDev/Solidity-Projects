@@ -334,7 +334,7 @@ contract Referral is Ownable {
         uint256 workingDailyRewardWithdrawn;
         uint256 workingOneTimeRewardWithdrawn;
         uint256 lastWithDrawNonWorkingRewardTime;
-        uint256 totalWorkingRewardWithdrawn;
+        // uint256 totalWorkingRewardWithdrawn;
     }
 
     event RegisteredReferer(address referee, address referrer);
@@ -537,26 +537,27 @@ contract Referral is Ownable {
     
     function withDrawNonWorkingReward() external {
         MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
-        // Account[] storage userAccounts = accounts[msg.sender];
         uint256 _nonWorkingReward = calculateNonWorkingRewardOf(msg.sender);
-        // uint256 _workingReward = 
         Token.transfer(msg.sender, _nonWorkingReward);
         uint256 _totalTransferedWorkingRewardToUplines = _payWorkingRewardToUplines(_nonWorkingReward);
         userMetaInfo.lastWithDrawNonWorkingRewardTime = block.timestamp;
         _updateDataAccordingly(_nonWorkingReward, _totalTransferedWorkingRewardToUplines);
-        // emit TotalPaidToUplinesOnDailyWithDrawl(msg.sender, _totalTransferedWorkingRewardToUplines, index);
     }
     function _updateDataAccordingly(uint256 nonWorkingReward, uint256 workingRewardToUplines) public {
         Account[] storage userAccounts = accounts[msg.sender];
+        MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
+        uint256 totalWorkingRewardWithdrawn = userMetaInfo.workingDailyRewardWithdrawn.add(userMetaInfo.workingOneTimeRewardWithdrawn);
         uint256 currentTime = block.timestamp;
         for(uint i; i < userAccounts.length; i++){
             Account storage userAccount = userAccounts[i];
-            if(nonWorkingReward >= userAccount.investedAmount)
-        }
-        for(uint i; i < userAccounts.length; i++){
-            Account storage userAccount = userAccounts[i];
             if(userAccount.isActive){
-                userAccount.lastNonWorkingWithdrawTime = currentTime;
+                if(nonWorkingReward >= userAccount.investedAmount.mul(2) || totalWorkingRewardWithdrawn >= userAccount.investedAmount.mul(3)){
+                    userAccount.isActive = false;
+                    nonWorkingReward = nonWorkingReward.sub(userAccount.investedAmount);
+                }
+                if(userAccount.isActive){
+                    userAccount.lastNonWorkingWithdrawTime = currentTime;
+                }
             }
         }
     }
@@ -600,7 +601,7 @@ contract Referral is Ownable {
 
         for (uint256 i; i < MAX_REFER_DEPTH; i++) {
             address parent = userMetaInfo.referrer;
-            MetaInfo storage parentMetaInfo = metaInfoOf[userMetaInfo.referrer];
+            MetaInfo storage parentMetaInfo = metaInfoOf[parent];
 
             if (parent == address(0)) {
                 break;
