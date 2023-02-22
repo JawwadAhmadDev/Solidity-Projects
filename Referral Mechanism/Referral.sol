@@ -327,14 +327,17 @@ contract Referral is Ownable {
 
     struct MetaInfo {
         address referrer;
-        uint256 referredCount;
-        uint256 lastDirectTime;
+        uint256 totalReferredCount;
+        uint256 referredCount_sinceLastWithdrawl;
+        // uint256 lastDirectTime; // time to attach last downline.
+        // uint256 secondLastDirectTime; // to store data for 2 months. this will help at the time of boosting reward while withdrawing reward.
         uint256 dailyRewardPercent;
         uint256 biggesetInvestment;
         uint256 totalInvestedAmount;
         uint256 workingDailyReward_Pending;
         uint256 workingOneTimeReward_Pending;
-        uint256 lastWithDrawNonWorkingRewardTime;
+        // uint256 lastWithDrawNonWorkingRewardTime;
+        uint256 lastRewardWithdrawTime;
         uint256 totalWorkingReward_Pending;
     }
 
@@ -355,17 +358,23 @@ contract Referral is Ownable {
     mapping(address => uint256) public maxActiveInvestment;
     mapping(address => bool) public isNewComer;
 
-    address immutable defaultReferrerAddress;
-    uint8 defaultRewardPercent = 50; // 0.5%
-    uint256 public minInvestAmount = 100000;
+    uint8 private defaultRewardPercent = 50; // 0.5%
+    uint8 private boostRewardPercentPerActiveID = 5; // 0.05%
+    uint8 private rewardForFailedToMaintainBooster = 35; // 0.35%
+    uint8 private maxRewardPercent = 75; // 0.75 %
+    uint256 public timeDurationToBoostReward = 30; // 30 seconds for testing. In real it is 30 days.
+    uint256 public timeDurationToDowngradeReward = 90; // In real it is 90 days i.e. 3 months.
+    uint256 private marketingPercentage= 333; // 3.33%
+    uint256 public minInvestAmount = 100000; // 
     uint256 public maxInvestAmount = 100000000;
-    uint256[MAX_REFER_DEPTH] levelRate_OneTimeWorkingReward; // described as Level bonus in documentation
-    uint256[MAX_REFER_DEPTH] levelRate_DailyReward; // described as Reference bonus in description
-    IERC20 Token;
-    address marketing1=0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db;
-    address marketing2=0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db;
-    address marketing3=0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db;
-    uint256 marketingPercentage= 333; // 3.33%
+    uint256 private totalIDsCount;
+    uint256[MAX_REFER_DEPTH] private levelRate_OneTimeWorkingReward; // described as Level bonus in documentation
+    uint256[MAX_REFER_DEPTH] private levelRate_DailyReward; // described as Reference bonus in description
+    IERC20 public Token;
+    address immutable public defaultReferrerAddress;
+    address private marketing1 = 0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db;
+    address private marketing2 = 0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db;
+    address private marketing3 = 0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db;
 
     constructor(address _token, address _defaultReferrerAddress) {
         require(_token != address(0), "Referral: Invalid Token address");
@@ -487,9 +496,13 @@ contract Referral is Ownable {
 
         userMetaInfo.referrer = referrer;
         userMetaInfo.dailyRewardPercent = defaultRewardPercent;
+        userMetaInfo.lastRewardWithdrawTime = getTime();
 
-        parentMetaInfo.lastDirectTime = getTime();
-        parentMetaInfo.referredCount = parentMetaInfo.referredCount.add(1);
+        // parentMetaInfo.secondLastDirectTime = parentMetaInfo.lastDirectTime;
+        // parentMetaInfo.lastDirectTime = getTime();
+        parentMetaInfo.totalReferredCount = parentMetaInfo.totalReferredCount.add(1);
+        parentMetaInfo.referredCount_sinceLastWithdrawl = parentMetaInfo.referredCount_sinceLastWithdrawl.add(1);
+        totalIDsCount = totalIDsCount.add(1);
 
         emit RegisteredReferer(msg.sender, referrer);
         return true;
@@ -506,7 +519,7 @@ contract Referral is Ownable {
         MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
         MetaInfo storage parentMetaInfo = metaInfoOf[userMetaInfo.referrer];
         uint256 totalReferal;
-        uint256 _dailyRewardPercent = userMetaInfo.dailyRewardPercent;
+        // uint256 _dailyRewardPercent = userMetaInfo.dailyRewardPercent;
 
         for (uint256 i; i < MAX_REFER_DEPTH; i++) {
             address parent = userMetaInfo.referrer;
@@ -516,8 +529,8 @@ contract Referral is Ownable {
                 break;
             }
 
-            uint256 c = value.mul(_dailyRewardPercent).div(DECIMALS);
-            c = c.mul(levelRate_OneTimeWorkingReward[i]).div(DECIMALS);
+            // uint256 c = value.mul(_dailyRewardPercent).div(DECIMALS);
+            uint c = value.mul(levelRate_OneTimeWorkingReward[i]).div(DECIMALS);
 
             totalReferal = totalReferal.add(c);
 
@@ -540,6 +553,7 @@ contract Referral is Ownable {
     }
     
     function withDrawReward() external {
+        _updateDailyRewardPercent(msg.sender);
         uint256 _nonWorkingReward = calculateNonWorkingRewardOf(msg.sender);
         uint256 _workingReward = calculateWorkingRewardOf(msg.sender);
         uint256 _actualReward = _calculateActualReward(msg.sender, _nonWorkingReward, _workingReward);
@@ -547,15 +561,46 @@ contract Referral is Ownable {
         Token.transfer(msg.sender, _actualReward);
 
         _payWorkingRewardToUplines(_nonWorkingReward);
-        _updateDataAccordingly();
+        _updateDataAccordingly(msg.sender);
     }
+    function _updateDailyRewardPercent(address _addr) internal {
+        MetaInfo storage userMetaInfo = metaInfoOf[_addr];
+        uint256 currentTime = block.timestamp;
 
-    function _updateDataAccordingly() internal {
-        MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
+        if(currentTime > userMetaInfo.lastRewardWithdrawTime + timeDurationToDowngradeReward && userMetaInfo.referredCount_sinceLastWithdrawl == 0){
+            userMetaInfo.dailyRewardPercent = rewardForFailedToMaintainBooster;
+            return;
+        }
+        else {
+            if(userMetaInfo.referredCount_sinceLastWithdrawl == 0){
+                return;
+            }
+            else {
+                uint256 _rewardPercent = userMetaInfo.dailyRewardPercent.add(userMetaInfo.referredCount_sinceLastWithdrawl.mul(boostRewardPercentPerActiveID));
+                if(_rewardPercent > maxRewardPercent){
+                    userMetaInfo.dailyRewardPercent = maxRewardPercent;
+                }
+                else {
+                    userMetaInfo.dailyRewardPercent = _rewardPercent;
+                }
+            }
+            
+        }
+        
+    } 
+    function _updateDataAccordingly(address caller) internal {
+        uint256 currentTime = block.timestamp;
 
+        MetaInfo storage userMetaInfo = metaInfoOf[caller];
+        Account[] storage userAccounts = accounts[caller];
+        for(uint i; i < userAccounts.length; i++){
+            userAccounts[i].lastNonWorkingWithdrawTime = currentTime;
+        }
         userMetaInfo.workingDailyReward_Pending = 0;
         userMetaInfo.workingOneTimeReward_Pending = 0;
         userMetaInfo.totalWorkingReward_Pending = 0;
+        userMetaInfo.referredCount_sinceLastWithdrawl = 0;
+        userMetaInfo.lastRewardWithdrawTime = currentTime;
     }
     function calculateNonWorkingRewardOf(address _addr) public view returns (uint) {
         Account[] memory userAccounts = accounts[_addr];
@@ -697,18 +742,6 @@ contract Referral is Ownable {
         return actualReward;
     }
 
-    // function withDrawNonWorkingReward(uint256 index) external {
-    //     MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
-    //     uint256 _nonWorkingReward = calculateNonWorkingRewardOf(msg.sender, index);
-    //     // uint256 _workingReward = 
-    //     Token.transfer(msg.sender, _nonWorkingReward);
-    //     uint256 _totalTransferedWorkingRewardToUplines = _payWorkingRewardToUplines(_nonWorkingReward);
-    //     userMetaInfo.lastWithDrawNonWorkingRewardTime = block.timestamp;
-
-    //     emit TotalPaidToUplinesOnDailyWithDrawl(msg.sender, _totalTransferedWorkingRewardToUplines, index);
-    // }
-
-    
     function _payWorkingRewardToUplines(uint256 value) public returns (uint256) {
         MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
         uint256 totalReferal;
@@ -779,6 +812,10 @@ contract Referral is Ownable {
 
     function withdrawBNB(uint256 _amount) public onlyOwner{
         payable(msg.sender).transfer(_amount);
+    }
+
+    function getIDsCount() public view returns (uint) {
+        return totalIDsCount;
     }
 
 }
