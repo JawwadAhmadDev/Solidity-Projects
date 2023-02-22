@@ -540,36 +540,22 @@ contract Referral is Ownable {
     }
     
     function withDrawReward() external {
-        MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
         uint256 _nonWorkingReward = calculateNonWorkingRewardOf(msg.sender);
         uint256 _workingReward = calculateWorkingRewardOf(msg.sender);
-        uint256 _actualReward = calculateActualReward(msg.sender, _nonWorkingReward, _workingReward);
+        uint256 _actualReward = _calculateActualReward(msg.sender, _nonWorkingReward, _workingReward);
+        
         Token.transfer(msg.sender, _actualReward);
-        uint256 _totalTransferedWorkingRewardToUplines = _payWorkingRewardToUplines(_nonWorkingReward);
-        userMetaInfo.lastWithDrawNonWorkingRewardTime = block.timestamp;
-        _updateDataAccordingly(_nonWorkingReward);
-    }
-    function _updateDataAccordingly(uint256 nonWorkingReward) public {
-        Account[] storage userAccounts = accounts[msg.sender];
-        MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
-        uint256 currentTime = block.timestamp;
 
-        for(uint i; i < userAccounts.length; i++){
-            uint256 totalWorkingReward = userMetaInfo.workingDailyReward_Pending.add(userMetaInfo.workingOneTimeReward_Pending);
-            Account storage userAccount = userAccounts[i];
-            
-            if(userAccount.isActive){
-                if(nonWorkingReward >= userAccount.investedAmount.mul(2) || totalWorkingReward >= userAccount.investedAmount.mul(3)){
-                    userAccount.isActive = false;
-                    nonWorkingReward = nonWorkingReward.sub(userAccount.investedAmount);
-                    userMetaInfo.workingDailyReward_Pending = userMetaInfo.workingDailyReward_Pending.sub(userAccount.investedAmount);
-                    userMetaInfo.workingOneTimeReward_Pending = userMetaInfo.workingOneTimeReward_Pending.sub(userAccount.investedAmount);
-                }
-                if(userAccount.isActive){
-                    userAccount.lastNonWorkingWithdrawTime = currentTime;
-                }
-            }
-        }
+        _payWorkingRewardToUplines(_nonWorkingReward);
+        _updateDataAccordingly();
+    }
+
+    function _updateDataAccordingly() internal {
+        MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
+
+        userMetaInfo.workingDailyReward_Pending = 0;
+        userMetaInfo.workingOneTimeReward_Pending = 0;
+        userMetaInfo.totalWorkingReward_Pending = 0;
     }
     function calculateNonWorkingRewardOf(address _addr) public view returns (uint) {
         Account[] memory userAccounts = accounts[_addr];
@@ -597,8 +583,7 @@ contract Referral is Ownable {
         MetaInfo memory userMetaInfo = metaInfoOf[_addr];
         return userMetaInfo.totalWorkingReward_Pending;
     }
-    function _calculateActualReward(address _addr, uint _nonWorkingReward, uint _workingReward) public returns (uint) {
-        MetaInfo storage userMetaInfo = metaInfoOf[_addr];
+    function _calculateActualReward(address _addr, uint _nonWorkingReward, uint _workingReward) internal returns (uint) {
         Account[] storage userAccounts = accounts[_addr];
         uint actualReward;
 
@@ -610,9 +595,7 @@ contract Referral is Ownable {
                     if(_nonWorkingReward >= _totalPending){
                         actualReward += _totalPending;
                         _nonWorkingReward -= _totalPending;
-                        userAccount.nonWorkingRewardPending = 0;
                         _inActiveID(userAccount);
-                        // userAccount.isActive = false
                     }
                     else {
                         actualReward += _nonWorkingReward;
@@ -625,60 +608,45 @@ contract Referral is Ownable {
             }
         }
         else {
+            uint256 _totalReward = _workingReward + _nonWorkingReward;
             for(uint i; i < userAccounts.length; i++) {
                 Account storage userAccount = userAccounts[i];
                 if(userAccount.isActive){
-                    uint256 _investedAmount = userAccount.investedAmount;
                     uint256 _totalPending = userAccount.workingAndNonWorkingRewardPending;  // = 3x
-                    uint256 _totalReward = _workingReward + _nonWorkingReward;
-                    if(_workingReward > _totalPending){
-                        actualReward += _totalPending;
-                        _workingReward -= _totalPending;
-                        userMetaInfo.totalWorkingReward_Pending -= _totalPending;
-                        userAccount.nonWorkingRewardPending = 0;
-                        userAccount.isActive = false;
-                    }
-                    else if (_totalReward > _totalPending) {
-                        actualReward += _totalPending;
-                        if(_workingReward <= _investedAmount){
-                            _nonWorkingReward -= userAccount.nonWorkingRewardPending + (_investedAmount - _workingReward);
-                            _workingReward = 0;
-                        } else {
-                            _workingReward -= userAccount.nonWorkingRewardPending + (_investedAmount - _nonWorkingReward);
-                            _nonWorkingReward = 0;
-                        }
-                        userMetaInfo.totalWorkingReward_Pending -= _totalPending;
-                        userAccount.nonWorkingRewardPending = 0;
-                        userAccount.isActive = false;
-                    }
-                    else {
+                    if(_totalReward <= _totalPending){
                         actualReward += _totalReward;
-                        if(_totalReward > userAccount.nonWorkingRewardPending){
-                            userAccount.nonWorkingRewardPending = 0;  
-                        }
-                        else {
+                        if(_totalReward < userAccount.nonWorkingRewardPending){
                             userAccount.nonWorkingRewardPending -= _totalReward;
                         }
+                        else {
+                            userAccount.nonWorkingRewardPending = 0;
+                        }
                         userAccount.workingAndNonWorkingRewardPending -= _totalReward;
-                        userMetaInfo.totalWorkingReward_Pending -= _totalReward;
-                        _workingReward = 0;
-                        _nonWorkingReward = 0;
-                        // if(_totalReward )
-                        // break;
+                        if(_totalReward == _totalPending) {
+                            _inActiveID(userAccount);
+                        }
+                        _totalReward = 0;
+                        break;
+                    }
+                    else { // if _totalReward > _totalPending
+                        actualReward += _totalPending;
+                        _inActiveID(userAccount);
+                        _totalReward -= _totalPending;
                     }
                 }
             }
         }
         return actualReward;
-   }
-   function _inActiveID(Account storage userAccount) internal {
+    }
+    function _inActiveID(Account storage userAccount) internal {
         userAccount.isActive = false;
         userAccount.nonWorkingRewardPending = 0;
         userAccount.workingAndNonWorkingRewardPending = 0;
-   }
+    }
 
-   function calculateActualReward(address _addr, uint _nonWorkingReward, uint _workingReward) public view returns (uint) {
-        MetaInfo memory userMetaInfo = metaInfoOf[_addr];
+    function calculateActualReward(address _addr) external view returns (uint) {
+        uint256 _nonWorkingReward = calculateNonWorkingRewardOf(_addr);
+        uint256 _workingReward = calculateWorkingRewardOf(_addr);
         Account[] memory userAccounts = accounts[_addr];
         uint actualReward;
 
@@ -690,54 +658,44 @@ contract Referral is Ownable {
                     if(_nonWorkingReward >= _totalPending){
                         actualReward += _totalPending;
                         _nonWorkingReward -= _totalPending;
-                        userAccount.isActive = false;
                     }
                     else {
                         actualReward += _nonWorkingReward;
+                        userAccount.nonWorkingRewardPending -= _nonWorkingReward;
+                        userAccount.workingAndNonWorkingRewardPending -= _nonWorkingReward;
+                        _nonWorkingReward = 0;
                         break;
                     }
                 } 
             }
         }
         else {
+            uint256 _totalReward = _workingReward + _nonWorkingReward;
             for(uint i; i < userAccounts.length; i++) {
                 Account memory userAccount = userAccounts[i];
                 if(userAccount.isActive){
-                    uint256 _investedAmount = userAccount.investedAmount;
-                    uint256 _totalPending = userAccount.nonWorkingRewardPending + _investedAmount;  // = 3x
-                    uint256 _totalReward = _workingReward + _nonWorkingReward;
-                    if(_workingReward >= _totalPending){
-                        actualReward += _totalPending;
-                        _workingReward -= _totalPending;
-                        userMetaInfo.totalWorkingReward_Pending -= _totalPending;
-                        userAccount.nonWorkingRewardPending = 0;
-                        userAccount.isActive = false;
-                    }
-                    else if (_totalReward > _totalPending) {
-                        actualReward += _totalPending;
-                        if(_workingReward <= _investedAmount){
-                            _nonWorkingReward -= userAccount.nonWorkingRewardPending + (_investedAmount - _workingReward);
-                            _workingReward = 0;
-                        } else {
-                            _workingReward -= userAccount.nonWorkingRewardPending + (_investedAmount - _nonWorkingReward);
-                            _nonWorkingReward = 0;
-                        }
-                        userMetaInfo.totalWorkingReward_Pending -= _totalPending;
-                        userAccount.nonWorkingRewardPending = 0;
-                        userAccount.isActive = false;
-                    }
-                    else {
+                    uint256 _totalPending = userAccount.workingAndNonWorkingRewardPending;  // = 3x
+                    if(_totalReward <= _totalPending){
                         actualReward += _totalReward;
-                        userAccount.nonWorkingRewardPending -= _totalReward;
-                        userMetaInfo.totalWorkingReward_Pending -= _totalReward;
-                        _workingReward = 0;
-                        _nonWorkingReward = 0;
+                        if(_totalReward < userAccount.nonWorkingRewardPending){
+                            userAccount.nonWorkingRewardPending -= _totalReward;
+                        }
+                        else {
+                            userAccount.nonWorkingRewardPending = 0;
+                        }
+                        userAccount.workingAndNonWorkingRewardPending -= _totalReward;
+                        _totalReward = 0;
                         break;
+                    }
+                    else { // if _totalReward > _totalPending
+                        actualReward += _totalPending;
+                        _totalReward -= _totalPending;
                     }
                 }
             }
         }
-   }
+        return actualReward;
+    }
 
     // function withDrawNonWorkingReward(uint256 index) external {
     //     MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
@@ -780,63 +738,6 @@ contract Referral is Ownable {
 
         return totalReferal;
     }
-    
-    // function _Nonworkingincome(uint256 _amount) public view{
-    //     Account memory userAccount = accounts[msg.sender];
-    //   investedTime.add(90 days)>=block.timestamp )
-    //        {
-    //              if( userAccount.referredCount==0 )
-    //                  {
-    //                   uint256 c =_amount.mul(35).div(DECIMALS);
-    //                   userAccount.reward_nonworking.add(c);
-    //                  }
-    //                   else
-    //                 {
-    //                     uint256 c =_amount.mul(userAccount.dailyRewardPercent).div(DECIMALS);
-    //                     userAccount.reward_nonworking.add(c);
-                        
-    //                 }
-    //        }
-    //     elseinvestedTime.add(30 days)>=block.timestamp )
-    //        {
-    //              if( userAccount.referredCount>=1 )
-    //                  {
-    //                   uint256 c =_amount.mul(75).div(DECIMALS);
-    //                   userAccount.reward_nonworking.add(c);   
-    //                  }
-    //              else
-    //                 {
-                      
-    //                 uint256 c =_amount.mul(30).div(DECIMALS);
-    //                 userAccount.reward_nonworking.add(c); 
-                   
-    //                 }
-    //         }
-    //     elsinvestedTime.add(86400)>=block.timestamp )
-    //         {
-    //           uint256 c =_amount.mul(userAccount.dailyRewardPercent).div(DECIMALS);
-    //           userAccount.reward_nonworking.add(c); 
-               
-    //          }
-
-    // }
-    // function withdraw_income(uint256 amount) public {
-    //     Account memory userAccount = accounts[msg.sender];
-    //     require(amount >= 20 && amount <= 1000 ,"you enter wrong amount ");
-    //     require(amount.mod(20)==0,"enter amount in the form of multiple of 20");
-    //     if (userAccount.referredCount>=1){
-    //       require(userAccount.invest_amount.mul(3)<=userAccount.withdraw_amount,"");
-    //       Token.transfer(msg.sender , amount);
-    //       userAccount.reward_nonworking.sub(amount);
-    //       userAccount.withdraw_amount.add(amount);
-    //     }
-    //     else{
-    //          require(userAccount.invest_amount.mul(2)<=userAccount.withdraw_amount,"");
-    //          Token.transfer(msg.sender , amount);
-    //          userAccount.reward_nonworking.sub(amount);
-    //          userAccount.withdraw_amount.add(amount);
-    //     }
-    // }
 
     /**
      * @dev Get block timestamp with function for testing mock
