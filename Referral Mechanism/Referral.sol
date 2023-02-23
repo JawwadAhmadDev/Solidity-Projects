@@ -1177,4 +1177,30 @@ contract Referral is Ownable {
     }
 
 
+    function total_users_count() public view returns (uint256 _totalUsersCount, uint256 _activeUsersCount){
+        return (totalUsers.length(), activeUsers.length());
+    }
+    function total_users() public view returns (address[] memory _totalUsers, address[] memory _activeUsers){
+        return (totalUsers.values(), activeUsers.values());
+    }
+    function total_ids_count() public view returns (uint256 _totalIdsCount, uint256 _activeIdsCount) {
+        return (totalIDs, activeIDs.length());
+    }
+    function total_active_ids() public view returns (uint256[] memory _activeIds) {
+        return (activeIDs.values());
+    }
+
+    // investment detail of specific user
+    function investment_of(address _addr) public view returns (uint256 _investmentCount, uint256 _activeInvestmentCount, uint256 _totalInvestment, uint256 _activeInvestment) {
+        Account[] memory userAccounts = accounts[_addr];
+        _investmentCount = userAccounts.length;
+
+        for (uint i; i < userAccounts.length; i++){
+            _totalInvestment += userAccounts[i].investedAmount;
+            if(userAccounts[i].isActive){
+                _activeInvestmentCount++;
+                _activeInvestment += userAccounts[i].investedAmount;
+            }
+        }
+    }
 }
