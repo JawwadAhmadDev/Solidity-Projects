@@ -710,8 +710,8 @@ contract Referral is Ownable {
     uint256 public timeDurationToBoostReward = 30; // 30 seconds for testing. In real it is 30 days.
     uint256 public timeDurationToDowngradeReward = 90; // In real it is 90 days i.e. 3 months.
     uint256 private marketingPercentage= 333; // 3.33%
-    uint256 public minInvestAmount = 100000; // 
-    uint256 public maxInvestAmount = 100000000;
+    uint256 public minInvestAmount = 10000; // in reality it is 100. changed due to handle two decimal places.
+    uint256 public maxInvestAmount = 10000000;
     // uint256 private totalIDsCount;
     uint256[MAX_REFER_DEPTH] private levelRate_OneTimeWorkingReward; // described as Level bonus in documentation
     uint256[MAX_REFER_DEPTH] private levelRate_DailyReward; // described as Reference bonus in description
@@ -753,8 +753,10 @@ contract Referral is Ownable {
 
         Token.transferFrom(msg.sender, address(this), _amount);
 
+        Token.transfer(marketing1 , _amount.mul(marketingPercentage).div(DECIMALS));
+        Token.transfer(marketing2 , _amount.mul(marketingPercentage).div(DECIMALS));
+        Token.transfer(marketing3 , _amount.mul(marketingPercentage).div(DECIMALS));
         uint totalPaid = _payReferral(_amount);
-
         emit TotalPaidToUplinesOnEachInvestment(msg.sender, totalPaid, userAccounts.length);
     }
 
