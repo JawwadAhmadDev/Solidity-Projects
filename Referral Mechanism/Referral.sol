@@ -726,6 +726,7 @@ contract Referral is Ownable {
     event TotalPaidReferenceBonus(address from, uint256 amount, uint256 time);
     event UpdatedDailyRewardPercent(address _addr, uint256 from, uint256 to, uint256 time);
     event InActiveTimeOfID(uint256 id, uint256 time);
+    event WithDraw(address caller, uint amount, uint256 time);
 
     constructor(address _token, address _defaultReferrerAddress) {
         require(_token != address(0), "Referral: Invalid Token address");
@@ -842,7 +843,7 @@ contract Referral is Ownable {
         else {
             require(_amount >= minInvestAmount && _amount <= maxActiveInvestmentOf[caller], "Referral: Excees Limit");
         }
-        
+
         Token.transferFrom(caller, address(this), _amount);
 
         _initialize(_amount);
@@ -876,7 +877,7 @@ contract Referral is Ownable {
         * @param value The number tokens will be calculated in referral process
         * @return the total referral bonus paid
         */
-        function _payReferral(uint256 value) public returns (uint256) {
+        function _payReferral(uint256 value) internal returns (uint256) {
             MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
             MetaInfo storage parentMetaInfo = metaInfoOf[userMetaInfo.referrer];
             uint256 totalReferal;
@@ -927,6 +928,7 @@ contract Referral is Ownable {
         _updateDataAccordingly(caller);
 
         emit TotalPaidReferenceBonus(caller, _totalPaid, block.timestamp);
+        emit WithDraw(caller, _actualReward, block.timestamp);
     }
         function _updateDailyRewardPercent(address _addr) internal {
             MetaInfo storage userMetaInfo = metaInfoOf[_addr];
@@ -978,7 +980,7 @@ contract Referral is Ownable {
             userMetaInfo.referredCount_sinceLastWithdrawl = 0;
             userMetaInfo.lastRewardWithdrawTime = currentTime;
         }
-        function _payWorkingRewardToUplines(uint256 value) public returns (uint256) {
+        function _payWorkingRewardToUplines(uint256 value) internal returns (uint256) {
             MetaInfo storage userMetaInfo = metaInfoOf[msg.sender];
             uint256 totalReferal;
 
