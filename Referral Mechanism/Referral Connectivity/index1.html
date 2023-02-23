@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+</head>
+<body>
+
+    <h2>Binance Dapp!</h2>
+    <span id="network"></span> </br>
+    <span id="metamaskConnection"></span> </br>
+    <span id="lock"></span></br>
+    <span id="account"></span></br>
+    <span id="getBalance"></span>
+<h1>Write Functions:</h1>
+
+
+
+
+
+
+<div>
+    <h1>Register</h1>
+    <input type="text" id="referrerAddress" placeholder=" Referrer..."><br>
+    <input type="number" id="registerInvestment" placeholder=" Amount..."><br>
+    <button onclick="register()">Register</button>
+    <h3 id="registerHash"></h3>
+</div>
+
+
+<div>
+    <h1>Swap BNB to Token</h1>
+    <input type="number" id="getBNBToBeSwapped" placeholder=" Amount in BNB..."><br>
+    <button onclick="SwapBNBToToken()">Swap</button>
+    <h3 id="SwapBNBToTokenHash"></h3>
+</div>
+
+<!-- <div>
+    <h1>BNB to Dollar Converter</h1>
+    <input type="number" id="getBNBConvertedToDollar" placeholder=" Amount in BNB..."><br>
+    <button onclick="BNBToDollar()">Convert</button>
+    <h3 id="ConvertedBNB"></h3>
+</div>
+
+<div>
+    <h1>Dollar to BNB Converter</h1>
+    <input type="number" id="getDollarConvertedToBNB" placeholder=" Amount in Dollars..."><br>
+    <button onclick="DollarToBNB()">Convert</button>
+    <h3 id="ConvertedDollars"></h3>
+</div> -->
+
+<div>
+    <h1>BNB to Token Converter</h1>
+    <input type="number" id="getBNBConvertedToToken" placeholder=" Amount in BNB..."><br>
+    <button onclick="BNBToToken()">Convert</button>
+    <h3 id="ConvertedBNBsInToken"></h3>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    <script src="./index.js"></script>
+
+</body>
+
+</html>
