@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.19;
  //[10,20,20,20,50,10,20,20,20,50,10,20,20,20,50,10,20,20,20,50,10,20,20,20,50]
 interface IERC20 {
     
@@ -661,15 +661,20 @@ contract Referral is Ownable {
         uint256 investedAmount;
         uint256 nonWorkingRewardPending;
         uint256 workingAndNonWorkingRewardPending;
+        uint256 withDrawnAmount;
         uint256 lastNonWorkingWithdrawTime;
     }
 
     struct MetaInfo {
         address referrer;
+        bool isReference_ROI_Boosted;
+        uint256 registerTime;
         uint256 totalReferredCount;
+        uint256 totalDirectBusinessAmount;
         uint256 referredCount_sinceLastWithdrawl;
+        uint256 overAllWithdrawn;
         uint256 dailyRewardPercent;
-        uint256 biggesetInvestment;
+        // uint256 biggesetInvestment;
         uint256 totalInvestedAmount;
         uint256 workingDailyReward_Pending;
         uint256 workingOneTimeReward_Pending;
@@ -704,7 +709,7 @@ contract Referral is Ownable {
     
     uint256[MAX_REFER_DEPTH] public levelRate_OneTimeWorkingReward; // described as Level bonus in documentation
     uint256[MAX_REFER_DEPTH] public levelRate_DailyReward; // described as Reference bonus in description
-    
+    uint256[2] public reference_ROI_Booster;
     IERC20 public Token;
     address immutable public defaultReferrerAddress; 
     // @dev: change these marketing addresses to real addresses at the time of real deployment.
@@ -737,7 +742,9 @@ contract Referral is Ownable {
         levelRate_OneTimeWorkingReward = [500, 300, 200, 100, 50, 50, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25];
         // Reference Bonus: [25%, 10%, 5%, 3%, 1%, 1%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%, 0.5%]
         levelRate_DailyReward = [2500, 1000, 500, 300, 100, 100, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50];
-        
+        // Reference ROI Booster: [50%, 25%]
+        reference_ROI_Booster = [5000, 2500];
+
         defaultReferrerAddress = _defaultReferrerAddress;
     }
 
@@ -755,7 +762,7 @@ contract Referral is Ownable {
         require(_amount > 0, "Referral: Invalid amount");
         require(!isOldComer[caller], "Referral: Already Registered");
 
-        bool isRegistered = _register(_referrer);
+        bool isRegistered = _addReferrer(_referrer, _amount);
         require(isRegistered, "Referral: Invalid referrer address");
        
         Token.transferFrom(caller, address(this), _amount);
@@ -789,15 +796,15 @@ contract Referral is Ownable {
 
             return false;
         }
-        function _register(address _referrer) internal returns (bool) {
-            return _addReferrer(_referrer);
-        }
+        // function _register(address _referrer, uint256 _amount) internal returns (bool) {
+        //     return _addReferrer(_referrer, _amount);
+        // }
         /**
         * @dev Add an address as referrer
         * @param referrer The address would set as referrer of msg.sender
         * @return whether success to add upline
         */
-        function _addReferrer(address referrer) internal returns (bool) {
+        function _addReferrer(address referrer, uint256 amount) internal returns (bool) {
             address caller = msg.sender; // to reduce gas cost
 
             if (referrer == address(0)) {
@@ -822,8 +829,10 @@ contract Referral is Ownable {
             userMetaInfo.referrer = referrer;
             userMetaInfo.dailyRewardPercent = defaultRewardPercent;
             userMetaInfo.lastRewardWithdrawTime = block.timestamp;
+            userMetaInfo.registerTime = block.timestamp;
 
             parentMetaInfo.totalReferredCount = parentMetaInfo.totalReferredCount.add(1);
+            parentMetaInfo.totalDirectBusinessAmount = parentMetaInfo.totalDirectBusinessAmount.add(amount);
             parentMetaInfo.referredCount_sinceLastWithdrawl = parentMetaInfo.referredCount_sinceLastWithdrawl.add(1);
             totalUsers.add(caller);
             activeUsers.add(caller);
@@ -861,6 +870,7 @@ contract Referral is Ownable {
                 nonWorkingRewardPending: _amount.mul(2),
                 workingAndNonWorkingRewardPending: _amount.mul(3),
                 investedAmount: _amount,
+                withDrawnAmount: 0,
                 investedTime: block.timestamp,
                 lastNonWorkingWithdrawTime: block.timestamp
             }));
@@ -889,8 +899,17 @@ contract Referral is Ownable {
                 if (parent == address(0)) {
                     break;
                 }
+                
+                // check whether an address is capable for reference ROI booster program or not.
+                // @dev: change 30 to 30 days at the time of real deployment.
+                if(i < 2 && !_parentMetaInfo.isReference_ROI_Boosted && block.timestamp < _parentMetaInfo.registerTime + 30) { // Reference ROI Booster program will be checked just for first 2 levels.
+                    if(parentMetaInfo.totalReferredCount >= 5 && parentMetaInfo.totalDirectBusinessAmount >= 3000){
+                        parentMetaInfo.isReference_ROI_Boosted = true;
+                    }                    
+                }
 
                 uint c = value.mul(levelRate_OneTimeWorkingReward[i]).div(DECIMALS);
+                
 
                 totalReferal = totalReferal.add(c);
 
@@ -903,9 +922,9 @@ contract Referral is Ownable {
             }
 
             userMetaInfo.totalInvestedAmount = userMetaInfo.totalInvestedAmount.add(value);
-            if(value > parentMetaInfo.biggesetInvestment) {
-                parentMetaInfo.biggesetInvestment = value;
-            }
+            // if(value > parentMetaInfo.biggesetInvestment) {
+            //     parentMetaInfo.biggesetInvestment = value;
+            // }
 
             // updateActiveTimestamp(msg.sender);
             return totalReferal;
@@ -925,7 +944,7 @@ contract Referral is Ownable {
         Token.transfer(caller, _actualReward);
 
         uint256 _totalPaid = _payWorkingRewardToUplines(_nonWorkingReward);
-        _updateDataAccordingly(caller);
+        _updateDataAccordingly(caller, _actualReward);
 
         emit TotalPaidReferenceBonus(caller, _totalPaid, block.timestamp);
         emit WithDraw(caller, _actualReward, block.timestamp);
@@ -959,7 +978,7 @@ contract Referral is Ownable {
             }
             
         } 
-        function _updateDataAccordingly(address caller) internal {
+        function _updateDataAccordingly(address caller, uint256 actualReward) internal {
             uint256 currentTime = block.timestamp;
 
             MetaInfo storage userMetaInfo = metaInfoOf[caller];
@@ -974,6 +993,7 @@ contract Referral is Ownable {
             if(count == userAccounts.length)
                 activeUsers.remove(caller);
 
+            userMetaInfo.overAllWithdrawn +=  actualReward;
             userMetaInfo.workingDailyReward_Pending = 0;
             userMetaInfo.workingOneTimeReward_Pending = 0;
             userMetaInfo.totalWorkingReward_Pending = 0;
@@ -992,8 +1012,13 @@ contract Referral is Ownable {
                     break;
                 }
 
-                uint256 c = value.mul(levelRate_DailyReward[i]).div(DECIMALS);
-
+                uint256 c;
+                if(i < 2 && parentMetaInfo.isReference_ROI_Boosted){
+                    c = value.mul(reference_ROI_Booster[1]).div(DECIMALS);
+                } else {
+                    c = value.mul(levelRate_DailyReward[i]).div(DECIMALS);
+                }
+                
                 totalReferal = totalReferal.add(c);
 
                 parentMetaInfo.workingDailyReward_Pending = parentMetaInfo.workingDailyReward_Pending.add(c);
@@ -1017,11 +1042,13 @@ contract Referral is Ownable {
                         uint256 _totalPending = userAccount.nonWorkingRewardPending; // = 2x
                         if(_nonWorkingReward >= _totalPending){
                             actualReward += _totalPending;
+                            userAccount.withDrawnAmount += _totalPending;
                             _nonWorkingReward -= _totalPending;
                             _inActiveID(userAccount);
                         }
                         else {
                             actualReward += _nonWorkingReward;
+                            userAccount.withDrawnAmount += _nonWorkingReward;
                             userAccount.nonWorkingRewardPending -= _nonWorkingReward;
                             userAccount.workingAndNonWorkingRewardPending -= _nonWorkingReward;
                             _nonWorkingReward = 0;
@@ -1045,6 +1072,7 @@ contract Referral is Ownable {
                                 userAccount.nonWorkingRewardPending = 0;
                             }
                             userAccount.workingAndNonWorkingRewardPending -= _totalReward;
+                            userAccount.withDrawnAmount += _totalReward;
                             if(_totalReward == _totalPending) {
                                 _inActiveID(userAccount);
                             }
@@ -1053,6 +1081,7 @@ contract Referral is Ownable {
                         }
                         else { // if _totalReward > _totalPending
                             actualReward += _totalPending;
+                            userAccount.withDrawnAmount += _totalPending;
                             _inActiveID(userAccount);
                             _totalReward -= _totalPending;
                         }
