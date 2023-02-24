@@ -844,6 +844,7 @@ contract Referral is Ownable {
 
     function invest(uint256 _amount) external {
         address caller = msg.sender;
+        Account[] storage userAccounts = accounts[caller];
 
         require(isOldComer[caller] || caller == defaultReferrerAddress, "Referral: Not registered yet or not a default referrer.");
         if(maxActiveInvestmentOf[caller] == 0){
@@ -851,6 +852,9 @@ contract Referral is Ownable {
         }
         else {
             require(_amount >= minInvestAmount && _amount <= maxActiveInvestmentOf[caller], "Referral: Excees Limit");
+        }
+        if(userAccounts.length > 0){
+            require(_amount >= userAccounts[userAccounts.length - 1].investedAmount, "Referral: Amount must be greater or equal to previus one");
         }
 
         Token.transferFrom(caller, address(this), _amount);
