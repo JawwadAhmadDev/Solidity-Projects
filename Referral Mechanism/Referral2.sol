@@ -763,6 +763,8 @@ contract Referral is Ownable {
     uint256 private constant DECIMALS = 10000; // 10000 / 100 = 100. to calculate percent
     uint256 private constant MAX_REFER_DEPTH = 25;
 
+
+
     // structure to hold detail of an account in the system
     struct Account {
         uint256 id;
@@ -777,6 +779,8 @@ contract Referral is Ownable {
         uint256 totalReferredCount;
         uint256 totalInvestedAmount;
     }
+
+
 
     address public defaultReferrer;
     IERC20 public token;
@@ -809,6 +813,8 @@ contract Referral is Ownable {
     event Invested(address invester, uint256 amount, uint256 time);
     event Withdrawn(address rewardCollector, uint256 amount, uint256 time);
 
+
+
     constructor(
         address _token,
         address _defaultReferrer,
@@ -821,6 +827,9 @@ contract Referral is Ownable {
         defaultReferrer = _defaultReferrer;
         marketingAddresses = _marketingAddresses;
     }
+
+
+
 
     // function to register in the system
     // caller should not be default referrer.
@@ -917,6 +926,10 @@ contract Referral is Ownable {
         return false;
     }
 
+
+
+
+
     // function for already registered user / default referrer to invest in the system
     function invest(uint256 _amount) external {
         address caller = msg.sender;
@@ -978,6 +991,11 @@ contract Referral is Ownable {
         emit Invested(caller, _amount, block.timestamp);
     }
 
+
+
+
+
+
     // function to withdraw reward of given amount
     // any user can his reward by calling get_pendingRewardOf() function before calling this function.
     function withdrawReward(uint256 _amount) external {
@@ -1000,10 +1018,16 @@ contract Referral is Ownable {
         emit Withdrawn(caller, _amount, block.timestamp);
     }
 
+
+
+
+    // -------------------Only Owner Functions -------------------//
+
     // update token address. only owner is capable.
     function Token(address _token) external onlyOwner {
         token = IERC20(_token);
     }
+
 
     // update minimum and maximum limit of investment. only owner is capable
     function MinAndMax_InvestableAmount(uint256 _minAmount, uint256 _maxAmount)
@@ -1014,6 +1038,7 @@ contract Referral is Ownable {
         max_investable_amount = _maxAmount;
     }
 
+
     // update maximum active investment of specific user. only owner is capable.
     function MaxActiveInvestmentOf(address _addr, uint256 _amount)
         external
@@ -1021,6 +1046,7 @@ contract Referral is Ownable {
     {
         maxActiveInvestmentOf[_addr] = _amount;
     }
+
 
     // update marketing address. only owner is authorized
     function MarketingAddresses(address[] memory _marketingAddresses)
@@ -1030,10 +1056,12 @@ contract Referral is Ownable {
         marketingAddresses = _marketingAddresses;
     }
 
+
     // update merketing percent only owner is authorized
     function MarketingPercentage(uint256 _percentage) external onlyOwner {
         marketingAddressesPercentage = _percentage;
     }
+
 
     // update withdrawable amounts of users. only owner is authorized
     function WithDrawableAmounts(
@@ -1057,6 +1085,7 @@ contract Referral is Ownable {
         }
     }
 
+
     // withdraw Tokens from smart contract address only owner is authorized
     function withdrawToken(address _token, uint256 _amount) external onlyOwner {
         require(
@@ -1065,14 +1094,21 @@ contract Referral is Ownable {
         );
     }
 
+
     // withdraw BNBs from smart contract address. only owner is authorized.
     function withdrawBNB(uint256 _amount) external onlyOwner {
         payable(msg.sender).transfer(_amount);
     }
 
+
+
+
+
+
     // -----------------------------------------------------//
     // VIEW FUNCTIONS //
     // -----------------------------------------------------//
+
 
     // --------------Global Data ------------//
     // Which users are registered yet.
@@ -1080,15 +1116,18 @@ contract Referral is Ownable {
         users = totalUsers.values();
     }
 
+
     // how many users are registered yet.
     function get_totalUsersCount() external view returns (uint256 usersCount) {
         usersCount = totalUsers.length();
     }
 
+
     // how much ids registered yet.
     function get_totalIDs() external view returns (uint256 ids) {
         ids = totalIDs;
     }
+
 
     // -------------Specific User Data ------------//
     // total accounts detail of a specific user
@@ -1115,6 +1154,7 @@ contract Referral is Ownable {
         return (ids, investedAmounts, investedTimes);
     }
 
+
     // total investment of a specific user
     function get_totalInvestmentOf(address _addr)
         external
@@ -1133,6 +1173,7 @@ contract Referral is Ownable {
     {
         return totalWithdrawnAmountOf[_addr];
     }
+
 
     // total reward uptill now of a user
     function get_pendingRewardOf(address _addr)
