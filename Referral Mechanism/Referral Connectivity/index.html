@@ -24,44 +24,60 @@
     <input type="text" id="referrerAddress" placeholder=" Referrer..."><br>
     <input type="number" id="registerInvestment" placeholder=" Amount..."><br>
     <button onclick="register()">Register</button>
-    <h3 id="Register_approveHash"></h3>
-    <h3 id="registerHash"></h3>
+    <h5 id="register_approveHash"></h5>
+    <h5 id="register_registerHash"></h5>
+    <h5 id="register_referreeAddress"></h5>
+    <h5 id="register_referrerAddress"></h5>
+    <h5 id="register_registeredAmount"></h5>
+    <h5 id="register_registeredTime"></h5>
 </div>
 
 <div>
-    <h1>Transaction Detial</h1>
-    <input type="text" id="transaction_hash" placeholder=" hash..."><br>
-    <button onclick="transactionDetail()">Get Detail</button>
+    <h1>Invest</h1>
+    <input type="number" id="investmentAmount" placeholder=" Amount..."><br>
+    <button onclick="invest()">Invest</button>
+    <h5 id="Invest_approveHash"></h5>
+    <h5 id="InvestHash"></h5>
+    <h5 id="Invest_invester"></h5>
+    <h5 id="Invest_investedAmount"></h5>
+    <h5 id="Invest_investedTime"></h5>
 </div>
 
 
 <div>
-    <h1>Swap BNB to Token</h1>
-    <input type="number" id="getBNBToBeSwapped" placeholder=" Amount in BNB..."><br>
-    <button onclick="SwapBNBToToken()">Swap</button>
-    <h3 id="SwapBNBToTokenHash"></h3>
-</div>
-
-<!-- <div>
-    <h1>BNB to Dollar Converter</h1>
-    <input type="number" id="getBNBConvertedToDollar" placeholder=" Amount in BNB..."><br>
-    <button onclick="BNBToDollar()">Convert</button>
-    <h3 id="ConvertedBNB"></h3>
+    <h1>Assign Rewards</h1>
+    <h4><i>(Only owner is authorized)</i></h4>
+    <button onclick="assignRewards()">Assign</button>
+    <h5 id="reward_hash"></h5>
 </div>
 
 <div>
-    <h1>Dollar to BNB Converter</h1>
-    <input type="number" id="getDollarConvertedToBNB" placeholder=" Amount in Dollars..."><br>
-    <button onclick="DollarToBNB()">Convert</button>
-    <h3 id="ConvertedDollars"></h3>
-</div> -->
+    <h1>WithDraw Reward</h1>
+    <input type="number" id="withDrawAmount" placeholder=" Amount..."><br>
+    <button onclick="withDrawReward()">Withdraw</button>
+    <h5 id="withdraw_withdrawHash"></h5>
+    <h5 id="withdraw_collector"></h5>
+    <h5 id="withdraw_withdrawnAmount"></h5>
+    <h5 id="withdraw_withdrawnTime"></h5>
+</div>
 
 <div>
-    <h1>BNB to Token Converter</h1>
-    <input type="number" id="getBNBConvertedToToken" placeholder=" Amount in BNB..."><br>
-    <button onclick="BNBToToken()">Convert</button>
-    <h3 id="ConvertedBNBsInToken"></h3>
+    <h1>Pending Reward Status</h1>
+    <input type="text" id="statusOfAddress" placeholder=" Address..."><br>
+    <button onclick="pendingRewardOf()">get Status</button>
+    <h5 id="pending_rewardAmount"></h5>
 </div>
+
+
+<div>
+    <h1>Get Data of Address</h1>
+    <input type="text" id="dataOfAddress" placeholder=" Address..."><br>
+    <button onclick="getDataOf()">get Data</button>
+    <h5 id="getData_ids"></h5>
+    <h5 id="getData_amounts"></h5>
+    <h5 id="getData_times"></h5>
+</div>
+
 
 
 
